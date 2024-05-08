@@ -11,6 +11,11 @@ const bookSchema = new Schema({
         required: true,
         trim: true// 문자열 양쪽 공백 제거
     },
+    ISBN:{
+        type: String,
+        required: true
+    }
+    ,
     author: {
         type: ObjectId,
         required: true, // 필수. 없으면 에러 띄운다.

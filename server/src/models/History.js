@@ -8,6 +8,11 @@ const historySchema = new Schema({
         required: true,
         ref: 'Book'
     },
+    ISBN: {
+        type: String,
+        require: true,
+        ref: 'Book'
+    },
     userId: {
         type: String,
         required: true,
@@ -26,8 +31,8 @@ const historySchema = new Schema({
         type: Date
     },
     status:{
-        type: Boolean,
-        default: false
+        type: String,
+        default: "대출"
     }
 })
 const History = mongoose.model('History', historySchema)
