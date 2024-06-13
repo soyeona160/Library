@@ -18,12 +18,10 @@ const bookSchema = new Schema({
     ,
     author: {
         type: ObjectId,
-        required: true, // 필수. 없으면 에러 띄운다.
-        ref: 'User' // 데이터 모델
+        required: true // 필수. 없으면 에러 띄운다.
     },
     summary: {
         type: String,
-        required: true,
         trim: true
     },
     release: {
@@ -34,3 +32,14 @@ const bookSchema = new Schema({
 
 const Book = mongoose.model('Todo', bookSchema)
 module.exports = Book
+
+
+bookSchema.virtual('bookdata').get(()=>{
+	return {
+		title: this.title, // this는 하나의 객체를 의미. 
+		ISBN: this.ISBN,
+		author: this.author,
+        summary: this.summary,
+        return : this.release
+	}
+})

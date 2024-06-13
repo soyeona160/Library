@@ -1,79 +1,125 @@
-const express= require('express')
-const User = require('../models/User')
+const express = require('express')
+const User = require('../models/User') 
+const History = require('../models/History') 
 const expressAsyncHandler = require('express-async-handler')
 const {generateToken , isAuth} = require('../../auth')
+const {validationResult, oneOf} = require('express-validator')
+const { validateName, validateEmail, validateUserPassword} = require('../../validator')
 const router = express.Router()
+const { limitUsage } = require('../../limiter')
 
-// 회원가입
-router.post('/register', expressAsyncHandler( async (req, res, next)=>{
-    console.log(req.body)
-    const user = new User({
-        name: req.body.name,
-        email: req.body.email,
-        userId: req.body.userId,
-        password: req.body.password
-    })
-    const newUser = await user.save()
-    if(!newUser){
-        res.status(400).json({code: 400, message: 'Invalid User Data'})
+
+
+// res.json("회원가입")
+router.post('/register',limitUsage, oneOf([
+  validateName(),
+  validateEmail(),
+  validateUserPassword()
+]), expressAsyncHandler(async (req, res, next) => {
+  const errors = validationResult(req)
+  if(!errors.isEmpty()){
+      console.log(errors.array())
+      res.status(400).json({ 
+          code: 400, 
+          message: 'Invalid Form data for user',
+          error: errors.array()
+      })
+  }else{
+      const user = new User({
+          name: req.body.name,
+          email: req.body.email,
+          userId: req.body.userId,
+          password: req.body.password
+      })
+      const newUser = await user.save() // DB에 User 생성
+      if(!newUser){
+          res.status(401).json({ code: 401, message: 'Invalid User Data'})
       }else{
-        const {name, email, userId, isAdmin, createdAt } = newUser
-        res.json({
-          code: 200, token: generateToken(newUser), // 사용자 식별, 권한검사 용도
-          name, email, userId, isAdmin, createdAt // 사용자에게 보여주기 위한 용도
-        })
+          const { name, email, userId, isAdmin} = newUser 
+          res.json({
+              code: 200,
+              token: generateToken(newUser),
+              name, email, userId, isAdmin
+          })
       }
+  }
 }))
 
-// 로그인
-router.post('/login', expressAsyncHandler( async (req, res, next)=>{
-    const loginUser= await User.findOne({
-        email: req.body.email,
+
+router.post('/login', limitUsage,
+oneOf( [validateEmail(), validateUserPassword()] ),
+  expressAsyncHandler(async (req, res, next) => {
+    const errors = validationResult(req)
+    if(!errors.isEmpty()){
+      console.log(errors.array())
+      res.status(400).json({
+        code: 400, message: 'Invalid Form data for user',
+        error: errors.array()
+      })
+    }else{
+      const loginUser= await User.findOne({
+        //쿼리
+        email : req.body.email,
         password: req.body.password
-    })
-    if(!loginUser){
+      })
+      if(!loginUser){
         res.status(401).json({code: 401, message: 'Invalid Email or password'})
       }else{
         const { name, email, userId, isAdmin, createdAt } = loginUser
         res.json({
           code: 200,
           token: generateToken(loginUser),
-          name, email, userId, isAdmin, createdAt
+          name, email, userId, isAdmin, createdAt,
+          status: loginUser.status,
+          createdAt: loginUser.createdAt,
+          lastModifiedAt: loginUser.lastModifiedAt
         })
       }
+    }
+
 }))
 
-router.put('/', isAuth, expressAsyncHandler( async(req, res, next) => {
-    // res.json("사용자정보 변경") 권한검사 필요
-    const user = await User.findById(req.user._id) // 회원인지 검사
-    if(!user){
-      res.status(404).json({code: 400, message: "User Not Found"})
-    }else{
-      user.name = req.body.name || user.name
-      user.email = req.body.email || user.email
-      user.password = req.body.password || user.password
-      user.lastModifiedAt = Date.now()
-  
-      const updatedUser = await user.save() //DB에 반영
-      const {name, email, userId, isAdmin, createdAt,lastModifiedAt} = updatedUser
-      res.json({
-        code: 200,
-        token : generateToken(updatedUser),
-        name, email, userId, isAdmin, createdAt, lastModifiedAt
+// res.json("사용자정보 변경") 권한검사 필요
+router.put('/', limitUsage,
+oneOf([validateName(), validateEmail(), validateUserPassword()]), isAuth, expressAsyncHandler( async(req, res, next) => {
+    const errors = validationResult(req)
+    if(!errors.array()){
+      res.status(400).json({
+        code: 400,
+        message: 'Invalid Form data for user',
+        error: errors.array()
       })
+    }else{
+      const user = await User.findById(req.user._id) // 회원인지 검사
+      if(!user){
+        res.status(404).json({code: 400, message: "User Not Found"})
+      }else{
+        user.name = req.body.name || user.name
+        user.email = req.body.email || user.email
+        user.password = req.body.password || user.password
+    
+        const updatedUser = await user.save() //DB에 반영
+        const {name, email, userId, isAdmin, createdAt , lastModifiedAt, status} = updatedUser
+        res.json({
+          code: 200,
+          token : generateToken(updatedUser),
+          name, email, userId, isAdmin, createdAt, lastModifiedAt, status
+        })
+      }
     }
+  }
+))
+router.delete('/',limitUsage, isAuth, expressAsyncHandler( async(req, res, next) => {
+  // res.json("사용자정보 삭제")
+
+  const user = await User.findByIdAndDelete(req.user._id) // user.id로 바꾸게됨
+  const history = await History.deleteMany(req.user._id)
+  // 찾고 지우기
+  if(!user){
+    res.status(404).json({code: 404, message:" User not Found "})
+  }else{
+    res.statusMessage(204).json({code: 204, message: 'User deleted successfully'}) // 204: 전달할 데이터 없음
+  }
 }))
 
-router.delete('/', isAuth, expressAsyncHandler( async(req, res, next) => {
-    // res.json("사용자정보 삭제")
-  
-    const user = await User.findByIdAndDelete(req.user._id) // user.id로 바꾸게됨
-    // 찾고 지우기
-    if(!user){
-      res.status(404).json({code: 404, message:" User not Found "})
-    }else{
-      res.statusMessage(204).json({code: 204, message: 'User deleted successfully'}) // 204: 전달할 데이터 없음
-    }
-  }))
-  
-  module.exports = router
+module.exports = router

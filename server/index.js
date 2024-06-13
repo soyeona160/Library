@@ -8,6 +8,8 @@ const mongoose = require('mongoose')
 const axios = require('axios')
 const usersRouter = require('./src/routes/users')
 const booksRouter = require('./src/routes/books')
+const historyRouter = require('./src/routes/history')
+const {limitUsage} = require('./limiter')
 
 
 const corsOptions = {
@@ -29,7 +31,8 @@ app.use(logger('tiny'))// Logger 설정
 
 app.use('/api/users', usersRouter)
 app.use('/api/books', booksRouter)
-app.get('/async-function', wrap(asyncFunction))
+app.use('/api/history', historyRouter)
+// app.get('/async-function', wrap(asyncFunction))
 
 app.get('/', (req, res)=>{
     res.send('hello world!')

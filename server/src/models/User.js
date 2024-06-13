@@ -30,8 +30,20 @@ const userSchema = new Schema({
     lastModifiedAt:{
         type: Date,
         default: Date.now
-    }
+    },
+    history : [{
+        type: mongoose.Types.ObjectId,
+        ref: "History"
+    }]
 })
 
 const User = mongoose.model('User', userSchema)
 module.exports = User
+
+userSchema.virtual('readOnlyData').get(()=>{
+	return {
+		id: this.userId, // this는 하나의 객체를 의미. 
+		email: this.email,
+		name: this.name,
+	}
+})

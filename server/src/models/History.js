@@ -1,31 +1,33 @@
 const mongoose = require('mongoose')
 const { Schema } = mongoose
+const moment = require('moment')
 
 
 const historySchema = new Schema({
     bookId: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
         required: true,
         ref: 'Book'
     },
     ISBN: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
         require: true,
         ref: 'Book'
     },
     userId: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
         required: true,
         ref: 'User'
     },
     checkoutAt: {
         type: Date,
-        default: Date.now,
+        default: moment(), // 대출한 날짜
         required: true
     },
     dueDate: {
         type: Date,
-        required: true
+        required: true,
+        default: moment().add(14,"days") // 기본 2주
     },
     returnedAt:{
         type: Date
@@ -37,3 +39,15 @@ const historySchema = new Schema({
 })
 const History = mongoose.model('History', historySchema)
 module.exports = History
+
+
+historySchema.virtual('readOnlyData').get(()=>{
+	return {
+        bookId: this.bookId,
+		ISBN: this.ISBN, // this는 하나의 객체를 의미. 
+		checkoutAt: this.checkoutAt,
+        dueDate: this.dueDate,
+        returnedAt:this.returnedAt,
+        status : this.status
+	}
+})
